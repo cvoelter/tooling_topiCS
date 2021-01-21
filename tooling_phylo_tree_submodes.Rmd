@@ -498,8 +498,8 @@ px
 ```
 save plot:
 ```{r, cache=TRUE}
-ggsave("graphs/Fig2_phylo_full_submodes.pdf", width = 9.5, height = 6.5, scale = 0.8)
-ggsave("graphs/Fig2_phylo_full_submodes.png", width = 9.5, height = 6.5, scale = 0.8)
+ggsave("graphs/Fig2_phylo_full_submodes.pdf", width = 10, height = 6.5, scale = 0.85)
+ggsave("graphs/Fig2_phylo_full_submodes.png", width = 10, height = 6.5, scale = 0.85)
 ```
 
 
