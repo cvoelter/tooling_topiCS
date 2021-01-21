@@ -1,0 +1,517 @@
+---
+title: "Tooling review - Phylogenetic Tree"
+output: 
+  html_notebook:
+    css: style.css
+    theme: paper
+---
+
+Load packages
+
+```{r, message=FALSE}
+stringsAsFactors <- TRUE
+library(tidyverse)
+library(gridExtra)
+library(cowplot)
+library(viridis)
+library(ggridges)
+library(ggstance)
+library(treeio)
+library(ggtree)
+library(tidytree)
+
+```
+
+Load and combine data
+
+```{r, message=FALSE}
+studies <- read_csv("data/Tooling_Table_V8.csv") %>%
+  filter(group == "great apes" | group == "prosimians" | group == "ow_monkeys" | group == "nw_monkeys" | group == "lesser apes") %>%
+  mutate(tooling = ifelse(tooling_or_IOU == "tooling", 1, ifelse(tooling_or_IOU == "IOU", 0, NA))) %>%
+  mutate(latin_name = fct_recode(latin_name, "Cebus spp." = "Cebus [Sapajus] apella", "Cebus spp." = "Cebus [Sapajus] spp.", "Cebus spp." = "Cebinae (unspecified)", "Cebus spp." = "Cebus apella", "Cebus spp." = "Cebus capucinus imitator", "Cercocebus spp." = "Cercocebus agilis", "Cercocebus spp." = "Cercocebus atys", "Cercopithecus spp." = "Cercopithecus ascanius", "Cercopithecus spp." = "Ceropithecus campbelli", "Hylobates spp." = "Hylobates lar", "Hylobates spp." = "Hylobates symphalangus", "Hylobates spp." = "Hylobates agilis", "Hylobates spp." = "Hylobates spp", "Ateles spp." = "Ateles geoffroyi", "Macaca spp." = "Macaca (unspecified)", "Macaca spp." = "Macaca cyclopis", "Macaca spp." = "Macaca fascicularis", "Macaca spp." = "Macaca fuscata", "Macaca spp." = "Macaca mulatta", "Macaca spp." = "Macaca nemestrina", "Macaca spp." = "Macaca nigra", "Macaca spp." = "Macaca radiata", "Macaca spp." = "Macaca silenus", "Macaca spp." = "Macaca speciosa", "Macaca spp." = "Macaca sylvanus", "Macaca spp." = "Macaca tonkeana", "Papio spp." = "Papio anubis", "Papio spp." = "Papio cynocephalus", "Papio spp." = "Papio hamadryas", "Papio spp." = "Papio papio", "Papio spp." = "Papio ursinus", "Piliocolobus spp." = "Piliocolobus badius", "Saimiri spp." = "Saimiri sciureus", "Cebus spp." = "Sapajus cay [Cebus paraguayanus]", "Cebus spp." = "Cebinae spp.", "Alouatta spp." = "Alouatta seniculus", "Eulemur macaco" = "Eulemur fulvus", "Chlorocebus sabaeus" = "Chlorocebus aethiops", "Mandrillus sphinx" = "Mandrillus leucophaeus", "gorilla spp" = "Gorilla spp")) %>%
+  droplevels()
+
+studies_all <- studies %>%
+  group_by(latin_name) %>%
+  summarise(tool_use_submodes = length(unique(submode)), Nstudies = sum(total_references, na.rm = TRUE)) %>%
+  rename(species = latin_name)
+
+studies_tooling <- studies %>%
+  filter(tooling == 1) %>%
+  group_by(latin_name) %>%
+  summarise(tooling_submodes = length(unique(submode))) %>% # the number of unique submodes per genus
+  rename(species = latin_name)
+
+studies <- studies_all %>%
+  full_join(studies_tooling)
+
+
+levels(as.factor(studies$species))
+
+
+species <- read_csv("data/species_gsheet.csv")
+fulltree <- read.nexus("data/consensusTree_10kTrees_298Primates_V3.nex")
+refs <- read_csv("data/ref_nodes.csv")
+```
+
+```{r}
+data <- studies %>%
+  left_join(species, by = c("species" = "species_file")) %>%
+  rename(label = species_tree, label2 = updated_nomenclature, num = tool_use_submodes) %>%
+  mutate(
+    label2 = ifelse(is.na(label2), label, label2),
+    label2 = fct_recode(label2,
+      "Cebus_spp." = "Sapajus_apella",
+      "Ateles_spp." = "Ateles_geoffroyi",
+      "Alouatta spp." = "Alouatta_seniculus",
+      "Colobus_spp." = "Colobus_angolensis_angolensis",
+      "Aotus_spp." = "Aotus_azarae_azarae",
+      "Cercocebus_spp." = "Cercocebus_agilis",
+      "Cercopithecus_spp." = "Cercopithecus_ascanius",
+      "Galagonidae_spp." = "Galago_alleni",
+      "Gorilla_spp." = "Gorilla_gorilla",
+      "Hylobates_spp." = "Hylobates_agilis",
+      "Lophocebus_spp." = "Lophocebus_albigena",
+      "Loridae_spp." = "Loris_lydekkerianus",
+      "Macaca_spp." = "Macaca_arctoides",
+      "Piliocolobus_spp." = "Piliocolobus_badius",
+      "Pithecia_spp." = "Pithecia_irrorata",
+      "Saimiri_spp." = "Saimiri_sciureus"
+    )
+  ) %>%
+  select(label, label2, species, num, tooling_submodes, Nstudies)
+```
+
+
+
+```{r}
+# change labels to genus names
+species <- species %>%
+  mutate(updated_nomenclature = fct_recode(updated_nomenclature,
+    "Cebus_spp." = "Sapajus_apella",
+    "Ateles_spp." = "Ateles_geoffroyi",
+    "Alouatta spp." = "Alouatta_seniculus",
+    "Colobus_spp." = "Colobus_angolensis_angolensis",
+    "Aotus_spp." = "Aotus_azarae_azarae",
+    "Cercocebus_spp." = "Cercocebus_agilis",
+    "Cercopithecus_spp." = "Cercopithecus_ascanius",
+    "Galago_spp." = "Galago_alleni",
+    "Gorilla_spp." = "Gorilla_gorilla",
+    "Hylobates_spp." = "Hylobates_agilis",
+    "Lophocebus_spp." = "Lophocebus_albigena",
+    "Loris_spp." = "Loris_lydekkerianus",
+    "Macaca_spp." = "Macaca_arctoides",
+    "Piliocolobus_spp." = "Piliocolobus_badius",
+    "Pithecia_spp." = "Pithecia_irrorata",
+    "Saimiri_spp." = "Saimiri_sciureus"
+  ))
+```
+
+
+
+```{r}
+# turn tree into tidy dataframe
+# drop all tips not needed for the tree
+tree2 <- fulltree %>%
+  drop.tip(c(
+    "Pan_troglodytes_schweinfurthii", "Pan_troglodytes_troglodytes",
+    "Pan_troglodytes_vellerosus", "Pongo_pygmaeus", "Cercopithecus_cephus_cephus",
+    "Cercopithecus_erythrogaster_erythrogaster", "Eulemur_fulvus_mayottensis",
+    "Hapalemur_griseus_griseus", "Microcebus_lokobensis", "Lepilemur_mitsinjoensis",
+    "Gorilla_gorilla_graueri", "Gorilla_beringei", "Cebus_xanthosternos",
+    "Aotus_azarae_boliviensis", "Aotus_lemurinus_brumbacki",
+    "Aotus_azarae_infulatus",
+    "Aotus_lemurinus_lemurinus",
+    "Aotus_lemurinus_griseimembra",
+    "Aotus_nancymaae",
+    "Aotus_nigriceps",
+    "Aotus_trivirgatus",
+    "Aotus_vociferans",
+    "Ateles_belzebuth",
+    "Ateles_fusciceps",
+    "Ateles_paniscus",
+    "Cebus_albifrons",
+    "Cebus_capucinus",
+    "Cebus_olivaceus",
+    "Cercocebus_galeritus",
+    "Cercocebus_torquatus",
+    "Cercocebus_torquatus_atys",
+    "Cercopithecus_albogularis",
+    "Cercopithecus_campbelli",
+    "Cercopithecus_lowei",
+    "Cercopithecus_cephus_cephus",
+    "Cercopithecus_cephus_ngottoensis",
+    "Cercopithecus_diana",
+    "Cercopithecus_erythrogaster",
+    "Cercopithecus_erythrotis",
+    "Cercopithecus_hamlyni",
+    "Cercopithecus_campbelli_lowei",
+    "Cercopithecus_cephus",
+    "Cercopithecus_hamlyni.",
+    "Cercopithecus_lhoesti",
+    "Cercopithecus_preussi",
+    "Cercopithecus_solatus",
+    "Allochrocebus_lhoesti",
+    "Cercopithecus_mitis",
+    "Cercopithecus_mona",
+    "Cercopithecus_neglectus",
+    "Cercopithecus_nictitans",
+    "Cercopithecus_petaurista",
+    "Cercopithecus_pogonias",
+    "Allochrocebus_preussi",
+    "Allochrocebus_solatus",
+    "Cercopithecus_wolfi",
+    "Colobus_angolensis_palliatus",
+    "Colobus_guereza",
+    "Colobus_polykomos",
+    "Colobus_satanas",
+    "Colobus_vellerosus",
+    "Galagoides_demidoff",
+    "Galago_gallarum",
+    "Galago_granti",
+    "Galago_matschiei",
+    "Galago_moholi",
+    "Galago_senegalensis",
+    "Galago_demidoff",
+    "Galago_zanzibaricus",
+    "Hylobates_klossii",
+    "Hylobates_lar",
+    "Hylobates_moloch",
+    "Hylobates_muelleri",
+    "Hylobates_pileatus",
+    "Lophocebus_aterrimus",
+    "Macaca_assamensis",
+    "Macaca_ochreata_brunnescens",
+    "Macaca_cyclopis",
+    "Macaca_fascicularis",
+    "Macaca_fuscata",
+    "Macaca_hecki",
+    "Macaca_leonina",
+    "Macaca_maura",
+    "Macaca_mulatta",
+    "Macaca_munzala",
+    "Macaca_nemestrina",
+    "Macaca_leonina",
+    "Macaca_pagensis_siberu",
+    "Macaca_nigra",
+    "Macaca_nigrescens",
+    "Macaca_ochreata_ochreata",
+    "Macaca_pagensis_pagensis",
+    "Macaca_radiata",
+    "Macaca_silenus",
+    "Macaca_sinica",
+    "Macaca_sylvanus",
+    "Macaca_thibetana",
+    "Macaca_tonkeana",
+    "Macaca_brunnescens",
+    "Macaca_nemestrina_leonina",
+    "Macaca_nemestrina_siberu",
+    "Macaca_ochreata",
+    "Macaca_pagensis",
+    "Papio_cynocephalus",
+    "Papio_hamadryas",
+    "Papio_papio",
+    "Papio_ursinus",
+    "Piliocolobus_foai",
+    "Piliocolobus_gordonorum",
+    "Piliocolobus_kirkii",
+    "Piliocolobus_pennantii",
+    "Piliocolobus_preussi",
+    "Piliocolobus_rufomitratus",
+    "Piliocolobus_tephrosceles",
+    "Piliocolobus_tholloni",
+    "Pithecia_pithecia",
+    "Saimiri_boliviensis",
+    "Saimiri_oerstedii",
+    "Saimiri_ustus",
+    "Alouatta_belzebul",
+    "Alouatta_caraya",
+    "Alouatta_guariba",
+    "Alouatta_palliata",
+    "Alouatta_pigra",
+    "Alouatta_sara",
+    "Aotus_azarai_boliviensis",
+    "Aotus_brumbacki",
+    "Aotus_infulatus",
+    "Aotus_lemurinus",
+    "Microcebus_berthae",
+    "Microcebus_bongolavensis",
+    "Microcebus_danfossi",
+    "Microcebus_griseorufus",
+    "Microcebus_jollyae",
+    "Microcebus_lehilahytsara",
+    "Microcebus_macarthurii",
+    "Microcebus_mamiratra",
+    "Microcebus_mittermeieri",
+    "Microcebus_myoxinus",
+    "Microcebus_ravelobensis",
+    "Microcebus_rufus",
+    "Microcebus_sambiranensis",
+    "Microcebus_simmonsi",
+    "Microcebus_tavaratra",
+    "Trachypithecus_auratus",
+    "Trachypithecus_delacouri",
+    "Trachypithecus_francoisi",
+    "Trachypithecus_geei",
+    "Trachypithecus_germaini",
+    "Trachypithecus_johnii",
+    "Trachypithecus_laotum",
+    "Trachypithecus_obscurus",
+    "Trachypithecus_phayrei",
+    "Trachypithecus_pileatus",
+    "Trachypithecus_poliocephalus",
+    "Trachypithecus_vetulus",
+    "Eulemur_coronatus",
+    "Eulemur_fulvus_albifrons",
+    "Eulemur_fulvus_albocollaris",
+    "Eulemur_fulvus_collaris",
+    "Eulemur_fulvus_rufus",
+    "Eulemur_fulvus_sanfordi",
+    "Eulemur_macaco_flavifrons",
+    "Eulemur_mongoz",
+    "Eulemur_rubriventer",
+    "Hapalemur_griseus",
+    "Hapalemur_griseus_alaotrensis",
+    "Hapalemur_griseus_meridionalis",
+    "Hapalemur_griseus_occidentalis",
+    "Hapalemur_simus",
+    "Lepilemur_ankaranensis",
+    "Lepilemur_dorsalis",
+    "Lepilemur_edwardsi",
+    "Lepilemur_hubbardorum",
+    "Lepilemur_leucopus",
+    "Lepilemur_manasamody",
+    "Lepilemur_microdon",
+    "Lepilemur_mustelinus",
+    "Lepilemur_otto",
+    "Lepilemur_randrianasoli",
+    "Lepilemur_ruficaudatus",
+    "Lepilemur_sahamalazensis",
+    "Lepilemur_seali",
+    "Lepilemur_septentrionalis",
+    "Callithrix_aurita",
+    "Callithrix_emiliae",
+    "Callithrix_geoffroyi",
+    "Callithrix_humeralifera",
+    "Callithrix_jacchus",
+    "Callithrix_kuhli",
+    "Callithrix_mauesi",
+    "Callithrix_penicillata",
+    "Callithrix_pygmaea",
+    "Leontopithecus_chrysopygus",
+    "Saguinus_fuscicollis",
+    "Saguinus_fuscicollis_melanoleucus",
+    "Saguinus_geoffroyi",
+    "Saguinus_imperator",
+    "Saguinus_leucopus",
+    "Saguinus_midas",
+    "Saguinus_mystax",
+    "Saguinus_niger",
+    "Saguinus_oedipus",
+    "Saguinus_tripartitus",
+    "Nycticebus_coucang",
+    "Nycticebus_javanicus",
+    "Nycticebus_menagensis",
+    "Nycticebus_pygmaeus",
+    "Nycticebus_bengalensis",
+    "Nomascus_gabriellae",
+    "Nomascus_leucogenys",
+    "Nomascus_nasutus",
+    "Nomascus_siki",
+    "Callicebus_hoffmannsi",
+    "Callicebus_moloch",
+    "Callicebus_personatus",
+    "Callicebus_torquatus",
+    "Cacajao_melanocephalus",
+    "Presbytis_melalophos",
+    "Pygathrix_nemaeus",
+    "Rhinopithecus_bieti",
+    "Rhinopithecus_brelichi",
+    "Rhinopithecus_roxellana",
+    "Galagoides_zanzibaricus",
+    "Otolemur_garnettii",
+    "Otolemur_crassicaudatus",
+    "Tarsius_dentatus",
+    "Tarsius_lariang",
+    "Tarsius_syrichta",
+    "Propithecus_deckenii",
+    "Propithecus_diadema",
+    "Propithecus_edwardsi",
+    "Propithecus_tattersalli",
+    "Propithecus_verreauxi",
+    "Avahi_laniger",
+    "Avahi_occidentalis",
+    "Avahi_unicolor",
+    "Cheirogaleus_major",
+    "Cheirogaleus_medius",
+    "Mirza_zaza",
+    "Loris_tardigradus",
+    "Arctocebus_calabarensis",
+    "Arctocebus_aureus",
+    "Chlorocebus_pygerythrus",
+    "Chlorocebus_pygerythrus_cynosurus",
+    "Chlorocebus_tantalus",
+    "Eulemur_fulvus_fulvus",
+    "Chlorocebus_aethiops",
+    "Mandrillus_leucophaeus",
+    "Phaner_furcifer_pallescens", 
+    "Euoticus_elegantulus",
+    "Perodicticus_potto"
+    
+  )) %>%
+  as_tibble()
+```
+
+
+```{r}
+# determine which nodes should be highlighted
+inner_nodes <- c(13, 10, 15, 19, 9, 62, 33, 110:117, 121:125, 64:103, 105:108, 21, 22, 24, 45, 25, 28, 32, 30, 36, 38:40, 35,  52:55, 60:61, 46:50, 2:4)
+
+tree3 <- tree2 %>%
+  left_join(data) %>%
+  left_join(species, by = c("label" = "species_tree")) %>%
+  select(-label, -label2, -species_file) %>%
+  rename(label = updated_nomenclature) %>%
+  mutate(
+    hasN = ifelse(is.na(Nstudies), .1, .5), # used to size branches + color the tip labels
+    hasN2 = ifelse(is.na(Nstudies) & !(node %in% inner_nodes), 0, .5), # used to color branches
+    label = fct_recode(label,
+      "Hapalemur_spp." = "Hapalemur_aureus",
+      "Lepilemur_spp." = "Lepilemur_aeeclis",
+      "Callithrix_spp." = "Mico_argentatus",
+      "Leontopithecus_spp." = "Leontopithecus_rosalia",
+      "Saguinus_spp." = "Saguinus_bicolor",
+      "Nomascus_spp." = "Nomascus_concolor",
+      "Callicebus_spp." = "Plecturocebus_donacophilus",
+      "Cacajao_spp." = "Cacajao_calvus",
+      "Presbytis_spp." = "Presbytis_comata",
+      "Pygathrix_spp." = "Pygathrix_cinerea",
+      "Rhinopithecus_spp." = "Rhinopithecus_avunculus",
+      "Tarsius_spp." = "Cephalopachus_bancanus",
+      "Propithecus_spp." = "Propithecus_coquereli",
+      "Avahi_spp." = "Avahi_cleesei",
+      "Cheirogaleus_spp." = "Cheirogaleus_crossleyi",
+      "Mirza_spp." = "Mirza_coquereli",
+      "Pongo_spp." = "Pongo_abelii",
+      "Trachypithecus_spp." = "Trachypithecus_cristatus",
+      "Papio_spp." = "Papio_anubis",
+      "Eulemur_spp." = "Eulemur_macaco",
+      "Chlorocebus_spp." = "Chlorocebus_sabaeus",
+      "Mandrillus_spp." = "Mandrillus_sphinx",
+      "Plecturocebus_spp." = "Plecturocebus_donacophilus",
+      "Cebinae spp." = "Cebus_spp.",
+      "Phaner spp." = "Phaner_furcifer",
+      "Galagonidae spp."="Galago_spp.",
+      "Loridae spp."="Loris_spp.",
+      "Daubentonia_madagasc."="Daubentonia_madagascariensis"
+    ),
+    label = str_replace_all(label, "_", " ")
+  ) %>%
+  left_join(refs) %>%
+  groupClade(refs$node[-1]) %>%
+  mutate(group = fct_recode(group, "2" = "1"), prop = tooling_submodes / num, tooling_submodes = ifelse(tooling_submodes == 0, NA, tooling_submodes))
+
+# turn back into tree
+tree4 <- as.treedata(tree3)
+```
+
+# Circular tree of the 10ktree primates
+
+```{r}
+cols <- viridis(4, end = .9)
+```
+
+```{r}
+p <- ggtree(tree4, aes(alpha = hasN2), layout = "circular") +
+  # highlight clades with background colors
+  geom_hilight(node = 110, fill = cols[1], alpha = .3) +
+  geom_hilight(node = 63, fill = cols[1], alpha = .3) +
+  geom_hilight(node = 95, fill = cols[2], alpha = .3) + # nw monkeys
+  geom_hilight(node = 68, fill = cols[3], alpha = .3) + # ow monkeys
+  geom_hilight(node = 88, fill = cols[4], alpha = .3) + # apes
+  geom_tree() +
+  # root
+  geom_rootpoint(size = 1) +
+  # tips
+  geom_tippoint(aes(size = num), alpha = 0.7) +
+  geom_tippoint(aes(size = tooling_submodes), alpha = 0.7, color = "red") +
+  geom_tiplab2(aes(alpha = hasN), offset = 3, size = 2.5) +
+  # tweak scales
+  scale_alpha_continuous(range = c(.2, 1)) +
+  scale_size_area(max_size = 8) +
+  # widen plotting area
+  xlim(NA, 100) +
+  theme(legend.position = "none")
+
+q <- rotate(p, 20)
+```
+
+make legends:
+```{r}
+pcol <- ggplot(tibble(cols = cols, x = 1:4), aes(x, y = 1, col = cols)) +
+  geom_point(size = 6, alpha = .3) +
+  scale_color_identity("Clade",
+    guide = "legend", breaks = cols[4:1],
+    labels = c(
+      "Hominoidea", "Cercopithecoidea", "Platyrrhini",
+      "Tarsiiformes & Strepsirrhini"
+    )
+  ) +
+  theme_cowplot() +
+  theme(legend.text = element_text(size = 10))
+
+l1 <- get_legend(pcol)
+```
+
+```{r}
+cols2 <- c("#ff0000", "#000000")
+
+pcol2 <- ggplot(tibble(col = cols2, x = 1:2), aes(x, y = 1, col = cols2)) +
+  geom_point(size = 6, alpha = .7) +
+  scale_color_identity(
+    guide = "legend", breaks = cols2[1:2],
+    labels = c("Tooling", "Tool-use")
+  ) +
+  theme_cowplot() +
+  theme(legend.title = element_blank())
+
+l2 <- get_legend(pcol2)
+```
+
+
+```{r}
+psize <- ggplot(data, aes(size = num, x = 1, y = 1)) +
+  geom_point(alpha = .7, color = "black") +
+  scale_size_area("Number submodes", max_size = 8, breaks = c(1, 5, 10, 25, 50, 100)) +
+  theme_cowplot()
+
+l3 <- get_legend(psize)
+```
+
+add legend to plot:
+```{r, fig.width=7.5, fig.height=5.5, cache=TRUE}
+px <- plot_grid(p, plot_grid(NA, l1, l2, l3, NA, ncol = 1, rel_heights = c(.1, .2, .2, .2, .1)), NA,
+  nrow = 1, rel_widths = c(1, .38, .1)
+)
+
+px
+```
+save plot:
+```{r, cache=TRUE}
+ggsave("graphs/Fig2_phylo_full_submodes.pdf", width = 9.5, height = 6.5, scale = 0.8)
+ggsave("graphs/Fig2_phylo_full_submodes.png", width = 9.5, height = 6.5, scale = 0.8)
+```
+
+
+determine the node numbers:
+```{r, fig.width=8, fig.height=8, cache=TRUE, eval=FALSE}
+# to figure out node numbers
+n1 <- p + geom_text(aes(label = node, x = branch), size = 2, col = "blue", vjust = -.5)
+ggsave("graphs/full_tree_nodes_circular_submodes.pdf", n1, width = 8, height = 8, scale = 2)
+```
+
+# Session info
+
+```{r}
+sessionInfo()
+```

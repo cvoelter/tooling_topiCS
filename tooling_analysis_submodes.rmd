@@ -1,0 +1,624 @@
+---
+title: "Tooling review"
+author: "Christoph Voelter"
+date: "10/12/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+rm(list = ls())
+library(tidyverse)
+library(ggthemes)
+library(summarytools)
+library("ggsci")
+library("viridis") 
+
+```
+
+### Read data
+```{r}
+all.data<-read.csv(file = "data/Tooling_Table_V8.csv", stringsAsFactors=FALSE)%>%
+  select(1:21)%>%
+  mutate(tooling=ifelse(tooling_or_IOU=="tooling", 1, ifelse(tooling_or_IOU=="IOU",0,NA)))%>%
+  mutate(group=fct_relevel(group, "great apes", "lesser apes", "ow_monkeys", "nw_monkeys", "prosimians", "mammals", "birds", "reptiles", "amphibians","fish", "invertebrates"), latin_name2=latin_name)%>%
+  separate(latin_name2, c("genus_name", "species_name"))
+
+
+tooling.data<-all.data%>%
+  filter(tooling_or_IOU=="tooling")%>%
+  mutate(mode2=fct_recode(mode,  "pry"="pry/dig", "pound"= "pound/cut"))%>%
+   droplevels()
+
+#checks:
+view(dfSummary(all.data))
+
+view(dfSummary(tooling.data))
+
+levels(tooling.data$group)
+
+levels(as.factor(tooling.data$mode))
+levels(as.factor(tooling.data$mode2))
+
+levels(as.factor(tooling.data$submode))
+levels(as.factor(tooling.data$genus_name))
+levels(as.factor(tooling.data$latin_name))
+
+table(all.data$tooling, all.data$total_references)
+table(all.data$tooling, all.data$manufacture)
+table(all.data$tooling, all.data$associative)
+
+levels(as.factor(all.data$genus_name))
+
+table(all.data$tooling, all.data$submode)
+
+```
+### Descriptive stats
+```{r}
+#Tooling submodes
+length(unique(tooling.data$submode))
+
+#Tool-use submodes
+length(unique(all.data$submode))
+
+#Proportion tooling
+length(unique(tooling.data$submode))/length(unique(all.data$submode))
+```
+
+```{r}
+#Tooling genera
+length(unique(tooling.data$genus_name))# minus 2 (=76) to account for "Cebinae" and "Unknown" case
+
+#Tool-use genera
+length(unique(all.data$genus_name))# minus 2 to account for "Cebinae" and "Unknown"
+
+#Tooling submodes per genus
+xx<-tooling.data%>%
+  filter(genus_name!="Unspecified")%>%
+  mutate(genus_name=fct_recode(genus_name,"Cebinae"="Cebus"))%>%
+  group_by(group, genus_name)%>%
+  summarise(n.submodes=length(unique(submode)))
+
+length(xx$n.submodes)
+mean(xx$n.submodes)
+sd(xx$n.submodes)
+min(xx$n.submodes)
+max(xx$n.submodes)
+
+```
+
+```{r}
+#tooling submodes by support
+sup<-tooling.data%>%
+  filter(genus_name!="Unspecified")%>%
+  mutate(genus_name=fct_recode(genus_name,"Cebinae"="Cebus"), support2=ifelse(support=="anecdotal", "anecdotal", "oe"))%>%
+  group_by(genus_name, submode, support2)%>%
+  summarise(sum(tooling))
+
+anec<-sum(sup$support2=="anecdotal")
+obs<-sum(sup$support2!="anecdotal")
+
+all<-all.data%>%
+  filter(genus_name!="Unspecified")%>%
+  mutate(genus_name=fct_recode(genus_name,"Cebinae"="Cebus"), support2=ifelse(support=="anecdotal", "anecdotal", "oe"))%>%
+  group_by(genus_name, submode)%>%
+  summarise(sum=sum(tooling), sum.tooling=as.numeric(sum!=0), sum2=sum(tooling==0), sum.no.tooling=as.numeric(sum2!=0))
+
+
+all.tooling<-sum(all$sum.tooling)
+all.no.tooling<-sum(all$sum.no.tooling)
+all.submode.observations<-length(all$submode)
+
+#proportion of tooling submodes of all observed tool-use submodes across genera: 
+all.tooling/all.submode.observations
+```
+
+
+```{r}
+#proportion of observational/experimental tooling submodes
+obs/all.tooling
+#proportion of anecdotal tooling submodes
+(all.tooling-obs)/all.tooling
+```
+
+
+```{r}
+#tooling by frame of reference
+
+fr<-tooling.data%>%
+  filter(genus_name!="Unspecified")%>%
+  mutate(genus_name=fct_recode(genus_name,"Cebinae"="Cebus"))%>%
+  group_by(genus_name, submode, frame_of_reference)%>%
+  summarise(sum(tooling))
+
+ego<-sum(fr$frame_of_reference=="egocentric")
+allo<-sum(fr$frame_of_reference=="allocentric")
+ego/all.tooling
+allo/all.tooling
+```
+
+
+```{r}
+#tooling and tool manufacture
+manu<-tooling.data%>%
+  filter(genus_name!="Unspecified")%>%
+  mutate(genus_name=fct_recode(genus_name,"Cebinae"="Cebus"))%>%
+  group_by(genus_name, submode, manufacture)%>%
+  summarise(sum(tooling))
+
+manu.yes<-sum(manu$manufacture=="yes")
+manu.no<-sum(manu$manufacture=="no")
+manu.yes/all.tooling
+```
+
+```{r}
+#tooling manufacture submodes by support
+sup.manu<-tooling.data%>%
+  filter(genus_name!="Unspecified", manufacture=="yes")%>%
+  mutate(genus_name=fct_recode(genus_name,"Cebinae"="Cebus"), support2=ifelse(support=="anecdotal", "anecdotal", "oe"))%>%
+  group_by(genus_name, submode, support2)%>%
+  summarise(sum(tooling))
+
+anec.manu<-sum(sup.manu$support2=="anecdotal")
+obs.manu<-sum(sup.manu$support2!="anecdotal")
+
+all.manu<-all.data%>%
+  filter(genus_name!="Unspecified", manufacture=="yes")%>%
+  mutate(genus_name=fct_recode(genus_name,"Cebinae"="Cebus"), support2=ifelse(support=="anecdotal", "anecdotal", "oe"))%>%
+  group_by(genus_name, submode)%>%
+  summarise(sum=sum(tooling), sum.tooling=as.numeric(sum!=0), sum2=sum(tooling==0), sum.no.tooling=as.numeric(sum2!=0))
+
+
+all.manu<-sum(all.manu$sum.tooling)
+
+#proportion of observational/experimental tooling manufacturing submodes
+obs.manu/all.manu
+#proportion of anecdotal tooling manufacturing submodes
+(all.manu-obs.manu)/all.manu
+```
+
+
+```{r}
+#tooling and associative tool-use
+asso<-tooling.data%>%
+  filter(genus_name!="Unspecified")%>%
+  mutate(genus_name=fct_recode(genus_name,"Cebinae"="Cebus"))%>%
+  group_by(genus_name, submode, associative)%>%
+  summarise(sum(tooling))
+
+asso.yes<-sum(asso$associative=="yes")
+asso.no<-sum(asso$associative=="no")
+asso.yes/all.tooling
+
+```
+
+```{r}
+#associative tooling submodes by support
+sup.asso<-tooling.data%>%
+  filter(genus_name!="Unspecified", associative=="yes")%>%
+  mutate(genus_name=fct_recode(genus_name,"Cebinae"="Cebus"), support2=ifelse(support=="anecdotal", "anecdotal", "oe"))%>%
+  group_by(genus_name, submode, support2)%>%
+  summarise(sum(tooling))
+
+anec.asso<-sum(sup.asso$support2=="anecdotal")
+obs.asso<-sum(sup.asso$support2!="anecdotal")
+
+all.asso<-all.data%>%
+  filter(genus_name!="Unspecified", associative=="yes")%>%
+  mutate(genus_name=fct_recode(genus_name,"Cebinae"="Cebus"), support2=ifelse(support=="anecdotal", "anecdotal", "oe"))%>%
+  group_by(genus_name, submode)%>%
+  summarise(sum=sum(tooling), sum.tooling=as.numeric(sum!=0), sum2=sum(tooling==0), sum.no.tooling=as.numeric(sum2!=0))
+
+
+all.asso<-sum(all.asso$sum.tooling)
+
+#proportion of observational/experimental associative tooling  submodes
+obs.asso/all.asso
+#proportion of anecdotal associative tooling  submodes
+(all.asso-obs.asso)/all.asso
+```
+
+### Data by taxonomic group
+```{r}
+bird.data<-tooling.data%>%
+  filter(group=="birds", support!="anecdotal")%>%
+  group_by(genus_name, submode)%>%
+  summarise(sum(tooling))
+
+mammal.data<-tooling.data%>%
+  filter(group=="mammals", support!="anecdotal")%>%
+  group_by(genus_name, latin_name,species, submode)%>%
+  summarise(sum(tooling))
+
+invertebrate.data<-tooling.data%>%
+  filter(group=="invertebrates", support!="anecdotal")%>%
+  group_by(genus_name, latin_name,species, mode2, submode)%>%
+  summarise(sum(tooling))
+
+```
+
+
+### Phylogenetic distribution of tooling
+```{r}
+tooling.group.data<-tooling.data%>%
+    group_by(group)%>%
+  summarise(mean_tooling=mean(tooling, na.rm = TRUE), sd_tooling=sd(tooling , na.rm = TRUE), count_tool_use=length(tooling), sum_tooling=sum(tooling, na.rm = TRUE), sum_submode=length(unique(submode)), prop=sum_submode/159	)%>%
+  mutate(group=fct_recode(group, "old world monkeys"="ow_monkeys", "new world monkeys"="nw_monkeys", "non-primate mammals"="mammals", "gibbons"="lesser apes"))%>%
+  ungroup()%>%
+  arrange(desc(group))
+
+tooling.group.data%>%summarise(sum(sum_submode))
+
+```
+
+```{r}
+
+tooling.group.data$label <- scales::percent(tooling.group.data$prop,  accuracy=0.1)
+
+tooling.group.plot<- ggplot(tooling.group.data, aes(x="", y=prop, fill=group))+
+geom_bar(width = 1, stat = "identity") + 
+   coord_polar("y", start=0)+
+  theme_void()+ # remove background, grid, numeric labels
+  scale_fill_manual(values=c("#011638","royalblue4","#016FB9","#56B4E9","#D95F02","#66A61E","#E69F00"))+
+  #scale_fill_brewer(palette = "Dark2")+
+   theme(legend.title = element_blank()) +
+  geom_text(aes(x=1.7, y = cumsum(prop) - prop/2, label=label, show.legend = FALSE))+
+  scale_colour_manual(values=c("#000000"))
+tooling.group.plot
+
+
+ggsave(tooling.group.plot, filename="graphs/tooling_pie_chart_submodes.png", width=6, height=4, scale=0.8)
+
+```
+
+
+### Tool-use vs tooling (Figure 1a)
+
+```{r}
+tooling.group.submode.obs<-all.data%>%
+  mutate(support2=ifelse(support=="anecdotal" & tooling_or_IOU=="tooling", support, ifelse((support==""& tooling_or_IOU=="tooling")| tooling_or_IOU=="IOU", NA, "observational/experimental")))%>%
+  filter(support2=="observational/experimental")%>%
+  group_by(group, tooling_or_IOU, support2)%>%
+  summarise(submode_tooling_obs=length(unique(submode, na.rm = TRUE)))%>%
+  ungroup()
+
+
+tooling.group.submode.all.tooling<-all.data%>%
+  mutate(support2=ifelse(support=="anecdotal" & tooling_or_IOU=="tooling", support, ifelse((support==""& tooling_or_IOU=="tooling")| tooling_or_IOU=="IOU", NA, "observational/experimental")))%>%
+  filter(tooling_or_IOU=="tooling")%>%
+  group_by(group, tooling_or_IOU)%>%
+  summarise(submode_tooling_all=length(unique(submode, na.rm = TRUE)))%>%
+  ungroup()%>%
+  select(-tooling_or_IOU)
+
+
+tooling.group.submode.all.tool_use<-all.data%>%
+  group_by(group)%>%
+  summarise(submode_tooluse_all=length(unique(submode, na.rm = TRUE)))
+
+tooling_by_group_evidence<-tooling.group.submode.obs%>%
+  select(group, submode_tooling_obs)%>%
+  full_join(tooling.group.submode.all.tooling)%>%
+  full_join(tooling.group.submode.all.tool_use)%>%
+    replace(is.na(.), 0)%>%
+  mutate(submode_tooling_ane=submode_tooling_all-submode_tooling_obs, submode_notooling=submode_tooluse_all-submode_tooling_all)%>%
+  select(group, submode_tooling_obs, submode_tooling_ane, submode_notooling)%>%
+  gather(tool_use_type,value, submode_tooling_obs, submode_tooling_ane, submode_notooling)%>%
+  mutate(group=fct_recode(group, "old world monkeys"="ow_monkeys", "new world monkeys"="nw_monkeys", "non-primate mammals"="mammals", "gibbons"="lesser apes"), tool_use_type=fct_recode(tool_use_type, "Tool-use"="submode_notooling", "Tooling"="submode_tooling_obs", "Tooling (anecdotal)"="submode_tooling_ane"))
+
+all.tool.use.by.group=sum(tooling_by_group_evidence$value)
+tooling_by_group_evidence%>%group_by(tool_use_type)%>%summarise(sum=sum(value), prop=sum/159)
+
+tooling_by_group_evidence%>%filter(group=="birds")%>%group_by(tool_use_type)%>%summarise(sum=sum(value), prop=sum/25)
+
+```
+
+
+```{r}
+
+tooling.group.plot3<- ggplot(tooling_by_group_evidence, aes(x=group, y=value, fill=tool_use_type))+
+geom_col(position = "stack")+
+  #geom_bar(stat = "identity") + 
+    coord_flip()+
+#  theme_void()+ # remove background, grid, numeric labels
+  scale_fill_manual(values=c("lightgrey","#A1D99B","#66A61E" ))+
+ # scale_fill_brewer(palette="Paired")+
+  theme_bw()+
+   theme(legend.title = element_blank(), legend.position = c(0.65, 0.76), panel.grid.major = element_blank(),
+panel.grid.minor = element_blank(), axis.line = element_line(colour = "black")) +
+  ylab("Number of tool-use submodes")+
+  xlab("")+
+  ylim(0, 150)
+  
+tooling.group.plot3
+
+ggsave(tooling.group.plot3, filename = "graphs/tooling_by_group_support_submode.png", height=6, width = 8, scale=0.65)
+```
+
+### Tool manufacturing plot (Figure 1b)
+
+```{r}
+tooling.genus.submode.manu<-all.data%>%
+  filter(tooling_or_IOU=="tooling")%>%
+  filter(manufacture=="yes")%>%
+  group_by(group, genus_name, latin_name)%>%
+  summarise(submode_tooling_manu_obs=length(unique(submode)))%>%
+  ungroup()
+
+
+tooling.group.submode.manu.obs<-all.data%>%
+  mutate(support2=ifelse(support=="anecdotal" & tooling_or_IOU=="tooling", support, ifelse((support==""& tooling_or_IOU=="tooling")| tooling_or_IOU=="IOU", NA, "observational/experimental")))%>%
+  filter(tooling_or_IOU=="tooling")%>%
+  filter(support2=="observational/experimental")%>%
+  filter(manufacture=="yes")%>%
+  group_by(group)%>%
+  summarise(submode_tooling_manu_obs=length(unique(submode)))%>%
+  ungroup()
+
+
+tooling.group.submode.manu.all<-all.data%>%
+  mutate(support2=ifelse(support=="anecdotal" & tooling_or_IOU=="tooling", support, ifelse((support==""& tooling_or_IOU=="tooling")| tooling_or_IOU=="IOU", NA, "observational/experimental")))%>%
+  filter(tooling_or_IOU=="tooling")%>%
+  filter(manufacture=="yes")%>%
+  group_by(group)%>%
+  summarise(submode_tooling_manu_all=length(unique(submode)))%>%
+  ungroup()
+
+
+tooling_manu_by_group_evidence<-tooling.group.submode.manu.obs%>%
+  select(group, submode_tooling_manu_obs)%>%
+  full_join(tooling.group.submode.all.tooling)%>%
+  full_join(tooling.group.submode.manu.all)%>%
+    full_join(tooling.group.submode.all.tool_use)%>%
+    replace(is.na(.), 0)%>%
+  mutate(submode_tooling_manu_ane=submode_tooling_manu_all-submode_tooling_manu_obs, submode_tooling_no_manu=submode_tooling_all-submode_tooling_manu_all)%>%
+  select(group, submode_tooling_manu_obs, submode_tooling_manu_ane, submode_tooling_no_manu)%>%
+  gather(tool_use_type,value, submode_tooling_manu_obs, submode_tooling_manu_ane, submode_tooling_no_manu)%>%
+  mutate(group=fct_recode(group, "old world monkeys"="ow_monkeys", "new world monkeys"="nw_monkeys", "non-primate mammals"="mammals","gibbons"="lesser apes"), tool_use_type=fct_recode(tool_use_type, "Manufacture"="submode_tooling_manu_obs", "Manufacture (anecdotal)"="submode_tooling_manu_ane", "Tooling"="submode_tooling_no_manu"))%>%
+  mutate(tool_use_type=relevel(tool_use_type,  "Tooling", "Manufacture (anecdotal)","Manufacture"  ))
+
+```
+
+
+
+```{r}
+
+tooling.group.manu.plot<- ggplot(tooling_manu_by_group_evidence, aes(x=group, y=value, fill=tool_use_type))+
+geom_col(position = "stack")+
+  #geom_bar(stat = "identity") + 
+    coord_flip()+
+#  theme_void()+ # remove background, grid, numeric labels
+  scale_fill_manual(values=c("#A1D99B" ,"#9ECAE1","#4292C6" ))+
+ # scale_fill_brewer(palette="Paired")+
+  theme_bw()+
+   theme(legend.title = element_blank(), legend.position = c(0.65, 0.76), panel.grid.major = element_blank(),
+panel.grid.minor = element_blank(), axis.line = element_line(colour = "black")) +
+  ylab("Number of tool manufacture submodes")+
+  xlab("")+
+  ylim(0, 150)
+  
+tooling.group.manu.plot
+
+ggsave(tooling.group.manu.plot, filename = "graphs/tool_manufacturing_by_group_support_submode.png", height=6, width = 8, scale=0.65)
+```
+
+### Associative tool use (Figure 1c)
+
+```{r}
+
+tooling.genus.submode.asso<-all.data%>%
+  filter(tooling_or_IOU=="tooling")%>%
+  filter(associative=="yes")%>%
+  group_by(group, genus_name, latin_name, support)%>%
+  summarise(submode_tooling_asso=length(unique(submode)))%>%
+  ungroup()
+
+tooling.group.submode.asso.obs<-all.data%>%
+  mutate(support2=ifelse(support=="anecdotal" & tooling_or_IOU=="tooling", support, ifelse((support==""& tooling_or_IOU=="tooling")| tooling_or_IOU=="IOU", NA, "observational/experimental")))%>%
+  filter(tooling_or_IOU=="tooling")%>%
+  filter(support2=="observational/experimental")%>%
+  filter(associative=="yes")%>%
+  group_by(group)%>%
+  summarise(submode_tooling_asso_obs=length(unique(submode)))%>%
+  ungroup()
+
+
+
+tooling.group.submode.asso.all<-all.data%>%
+  mutate(support2=ifelse(support=="anecdotal" & tooling_or_IOU=="tooling", support, ifelse((support==""& tooling_or_IOU=="tooling")| tooling_or_IOU=="IOU", NA, "observational/experimental")))%>%
+  filter(tooling_or_IOU=="tooling")%>%
+  filter(associative=="yes")%>%
+  group_by(group)%>%
+  summarise(submode_tooling_asso_all=length(unique(submode)))%>%
+  ungroup()
+
+tooling_asso_by_group_evidence<-tooling.group.submode.asso.obs%>%
+  select(group, submode_tooling_asso_obs)%>%
+  full_join(tooling.group.submode.all.tooling)%>%
+  full_join(tooling.group.submode.asso.all)%>%
+    full_join(tooling.group.submode.all.tool_use)%>%
+    replace(is.na(.), 0)%>%
+  mutate(submode_tooling_asso_ane=submode_tooling_asso_all-submode_tooling_asso_obs, submode_tooling_no_assoc=submode_tooling_all-submode_tooling_asso_all)%>%
+  select(group, submode_tooling_asso_obs, submode_tooling_asso_ane, submode_tooling_no_assoc)%>%
+  gather(tool_use_type,value, submode_tooling_asso_obs, submode_tooling_asso_ane, submode_tooling_no_assoc)%>%
+  mutate(group=fct_recode(group, "old world monkeys"="ow_monkeys", "new world monkeys"="nw_monkeys", "non-primate mammals"="mammals","gibbons"="lesser apes"), tool_use_type=fct_recode(tool_use_type, "Associative Tooling"="submode_tooling_asso_obs", "Associative Tooling (anecdotal)"="submode_tooling_asso_ane", "Tooling"="submode_tooling_no_assoc"))%>%
+  mutate(tool_use_type=relevel(tool_use_type,  "Tooling", "Associative Tooling (anecdotal)","Associative Tooling"  ))
+
+```
+
+
+```{r}
+
+tooling.group.assoc.plot<- ggplot(tooling_asso_by_group_evidence, aes(x=group, y=value, fill=tool_use_type))+
+geom_col(position = "stack")+
+  #geom_bar(stat = "identity") + 
+    coord_flip()+
+#  theme_void()+ # remove background, grid, numeric labels
+  scale_fill_manual(values=c("#A1D99B" ,"#FDD0A2","#F16913" ))+
+ # scale_fill_brewer(palette="Paired")+
+  theme_bw()+
+   theme(legend.title = element_blank(), legend.position = c(0.65, 0.76), panel.grid.major = element_blank(),
+panel.grid.minor = element_blank(), axis.line = element_line(colour = "black")) +
+  ylab("Number of associative tooling submodes")+
+  xlab("")+
+  ylim(0, 150)
+  
+tooling.group.assoc.plot
+
+ggsave(tooling.group.assoc.plot, filename = "graphs/tool_associative_by_group_support_submodes.png", height=6, width = 8, scale=0.65)
+```
+### Combine plots (1a-c)
+```{r}
+library(cowplot)
+pg<-plot_grid(tooling.group.plot3, tooling.group.manu.plot, tooling.group.assoc.plot, nrow=3, labels = c("A", "B", "C"))
+
+ggsave(pg, filename="graphs/Fig1_tooling_submodes_by_group_plot_grid.png", width = 6, height=10, scale=0.8)
+
+```
+
+
+### Submode by frame of reference
+```{r}
+tooling.group.submode.ref<-all.data%>%
+  filter(tooling_or_IOU=="tooling")%>%
+  group_by(group, genus_name, tooling_or_IOU, frame_of_reference)%>%
+  summarise(submode_tooling=length(unique(submode, na.rm = TRUE)))%>%
+  ungroup()%>%
+  group_by(group, frame_of_reference)%>%
+  summarise(sum_submode_tooling=sum(submode_tooling))%>% mutate(group=fct_recode(group, "old world monkeys"="ow_monkeys", "new world monkeys"="nw_monkeys", "non-primate mammals"="mammals","gibbons"="lesser apes"))
+
+tooling.group.submode.ref%>%spread(frame_of_reference, sum_submode_tooling)%>%mutate(prop_ego=egocentric/(allocentric+egocentric), prop_allo=allocentric/(allocentric+egocentric))
+
+
+
+```
+
+```{r}
+
+tooling.group.refframe<- ggplot(tooling.group.submode.ref, aes(x=group, y=sum_submode_tooling, fill=frame_of_reference))+
+geom_col(position = "stack")+
+  #geom_bar(stat = "identity") + 
+    coord_flip()+
+#  theme_void()+ # remove background, grid, numeric labels
+  scale_fill_manual(values=c("#58641D","#DBD2E0" ))+
+ # scale_fill_brewer(palette="Paired")+
+  theme_bw()+
+   theme(legend.title = element_blank(), legend.position = c(0.8, 0.85), panel.grid.major = element_blank(),
+panel.grid.minor = element_blank(), axis.line = element_line(colour = "black")) +
+  ylab("Sum of tooling submodes across genera")+
+  xlab("")#+
+ # ylim(0, 150)
+  
+tooling.group.refframe
+
+ggsave(tooling.group.refframe, filename = "graphs/tooling_by_ref_frame_submode_abs.png", height=6, width = 8, scale=0.6)
+```
+```{r}
+
+tooling.group.refframe.prop<-ggplot(tooling.group.submode.ref, aes(x=group, y=sum_submode_tooling, fill=frame_of_reference))+
+geom_bar(position="fill", stat="identity")+
+    coord_flip()+
+  scale_fill_manual(values=c("#58641D","#DBD2E0" ))+
+  theme_bw()+
+   theme(legend.title = element_blank(),  panel.grid.major = element_blank(),
+panel.grid.minor = element_blank(), axis.line = element_line(colour = "black")) +
+  ylab("Proportion of tooling submodes per taxon")+
+  xlab("")
+
+tooling.group.refframe.prop
+
+ggsave(tooling.group.refframe.prop, filename = "graphs/Fig4_tooling_by_ref_frame_submode_prop.png", height=6, width = 10, scale=0.55)
+
+```
+
+
+
+
+           
+### Mode distribution (number of submodes)
+```{r}
+tooling.mode.data<-tooling.data%>%
+  mutate(group=fct_recode(group, "old world monkeys"="ow_monkeys", "new world monkeys"="nw_monkeys", "non-primate mammals"="mammals","gibbons"="lesser apes"))%>%
+    group_by(mode2, group)%>%
+  summarise( sum_tooling=sum(tooling, na.rm = TRUE), sum_studies=sum(total_references, na.rm = TRUE), sum_submode=length(unique(submode, na.rm=TRUE)))
+
+```
+
+```{r}
+library(RColorBrewer)
+nb.cols <- 17
+mycolors <- colorRampPalette(brewer.pal(8, "Dark2"))(nb.cols)
+
+
+tooling.mode.plot<- ggplot(tooling.mode.data%>%filter(group!="invertebrates"), aes(x=mode2, y=sum_submode, fill=mode2))+
+geom_bar(width = 1, stat = "identity") + 
+  #coord_polar("y", start=0)+
+  theme_bw()+ # remove background, grid, numeric labels
+  coord_flip()+
+  #scale_fill_manual(values=c("#011638","#003249","#016FB9","#56B4E9","#007EA7","#CDCDCD","#E69F00","#212922","#294936","#999999", "#E69F00"))+
+   theme(legend.position="none", panel.grid.major = element_blank(),
+panel.grid.minor = element_blank(), axis.line = element_line(colour = "black")) +
+  facet_wrap(~group) +
+  ylab("Number of tooling submodes")+
+  xlab("")+
+  # scale_fill_viridis(discrete = TRUE)
+scale_fill_manual(values = mycolors)
+
+tooling.mode.plot
+
+ggsave(tooling.mode.plot, filename = "graphs/tooling_mode_by_group_submode_new_order.png", height=7, width = 10, scale=0.66)
+```
+
+
+### Mode distribution (number of references)
+
+```{r}
+library(RColorBrewer)
+nb.cols <- 17
+mycolors <- colorRampPalette(brewer.pal(8, "Dark2"))(nb.cols)
+
+tooling.mode.data<-tooling.mode.data%>%
+  mutate(mode2=fct_relevel(mode2, "probe", "reach", "pound", "club", "jab", "pry", "wipe","absorb", "dig", "scratch", "contain", "cut", "affix", "symbolize", "brandish", "block"))
+
+tooling.mode.plot_refs<- ggplot(tooling.mode.data%>%filter(group!="invertebrates"), aes(x=mode2, y=sum_studies, fill=mode2))+
+geom_bar(width = 1, stat = "identity") + 
+  #coord_polar("y", start=0)+
+  theme_bw()+ # remove background, grid, numeric labels
+  coord_flip()+
+  #scale_fill_manual(values=c("#011638","#003249","#016FB9","#56B4E9","#007EA7","#CDCDCD","#E69F00","#212922","#294936","#999999", "#E69F00"))+
+   theme(legend.position="none", panel.grid.major = element_blank(),
+panel.grid.minor = element_blank(), axis.line = element_line(colour = "black")) +
+  facet_wrap(~group) +
+  ylab("Number of sources in Shumaker et al. (2011)")+
+  xlab("")+
+  # scale_fill_viridis(discrete = TRUE)
+  scale_fill_manual(values = mycolors) 
+
+tooling.mode.plot_refs
+
+ggsave(tooling.mode.plot_refs, filename = "graphs/Fig3_tooling_mode_by_group_number_references.png", height=7, width = 10, scale=0.66)
+```
+
+
+
+### purpose of submodes
+
+```{r}
+tooling.submode.per.group<-tooling.data%>%
+  group_by(group)%>%
+  summarise(length.submode=length(unique(submode)))
+
+tooling.purpose.data<-tooling.data%>%
+  mutate(submode2=submode)%>%
+  separate(submode2, c("action", "purpose"))%>%
+  group_by(group, purpose)%>%
+  summarise(length.submode.per.purpose=length(unique(submode)))%>%
+  ungroup()%>%
+  full_join(tooling.submode.per.group)%>%
+  mutate(prop=length.submode.per.purpose/length.submode)%>%
+  group_by(group)%>%
+  filter(prop==max(prop))
+
+```
+
