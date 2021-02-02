@@ -470,7 +470,7 @@ pcol2 <- ggplot(tibble(col = cols2, x = 1:2), aes(x, y = 1, col = cols2)) +
   geom_point(size = 6, alpha = .7) +
   scale_color_identity(
     guide = "legend", breaks = cols2[1:2],
-    labels = c("Tooling", "Tool-use")
+    labels = c("Tooling", "Tool use")
   ) +
   theme_cowplot() +
   theme(legend.title = element_blank())
@@ -482,7 +482,7 @@ l2 <- get_legend(pcol2)
 ```{r}
 psize <- ggplot(data, aes(size = num, x = 1, y = 1)) +
   geom_point(alpha = .7, color = "black") +
-  scale_size_area("Number submodes", max_size = 8, breaks = c(1, 5, 10, 25, 50, 100)) +
+  scale_size_area("Number Submodes", max_size = 8, breaks = c(1, 5, 10, 25, 50, 100)) +
   theme_cowplot()
 
 l3 <- get_legend(psize)
