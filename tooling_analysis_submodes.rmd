@@ -305,7 +305,7 @@ tooling_by_group_evidence<-tooling.group.submode.obs%>%
   mutate(submode_tooling_ane=submode_tooling_all-submode_tooling_obs, submode_notooling=submode_tooluse_all-submode_tooling_all)%>%
   select(group, submode_tooling_obs, submode_tooling_ane, submode_notooling)%>%
   gather(tool_use_type,value, submode_tooling_obs, submode_tooling_ane, submode_notooling)%>%
-  mutate(group=fct_recode(group, "Old World Monkeys"="ow_monkeys", "New World Monkeys"="nw_monkeys", "Non-primate Mammals"="mammals","Gibbons"="lesser apes", "Great Apes"="great apes", "Invertebrates"="invertebrates", "Fish"="fish", "Amphibians"="amphibians","Reptiles"="reptiles", "Birds"="birds", "Prosimians"="prosimians"), tool_use_type=fct_recode(tool_use_type, "Tool use"="submode_notooling", "Tooling"="submode_tooling_obs", "Tooling (anecdotal)"="submode_tooling_ane"))
+  mutate(group=fct_recode(group, "Old World Monkeys"="ow_monkeys", "New World Monkeys"="nw_monkeys", "Non-primate Mammals"="mammals","Gibbons"="lesser apes", "Great Apes"="great apes", "Invertebrates"="invertebrates", "Fish"="fish", "Amphibians"="amphibians","Reptiles"="reptiles", "Birds"="birds", "Prosimians"="prosimians"), tool_use_type=fct_recode(tool_use_type, "Tool use"="submode_notooling", "Tooling (obs. / exp.)"="submode_tooling_obs", "Tooling (anecdotal)"="submode_tooling_ane"))
 
 all.tool.use.by.group=sum(tooling_by_group_evidence$value)
 tooling_by_group_evidence%>%group_by(tool_use_type)%>%summarise(sum=sum(value), prop=sum/159)
@@ -327,7 +327,7 @@ geom_col(position = "stack")+
   theme_bw()+
    theme(legend.title = element_blank(), legend.position = c(0.65, 0.76), panel.grid.major = element_blank(),
 panel.grid.minor = element_blank(), axis.line = element_line(colour = "black")) +
-  ylab("Number of Tool-use Submodes")+
+  ylab("Number of Tool Use Submodes")+
   xlab("")+
   ylim(0, 150)
   
@@ -375,8 +375,8 @@ tooling_manu_by_group_evidence<-tooling.group.submode.manu.obs%>%
   mutate(submode_tooling_manu_ane=submode_tooling_manu_all-submode_tooling_manu_obs, submode_tooling_no_manu=submode_tooling_all-submode_tooling_manu_all)%>%
   select(group, submode_tooling_manu_obs, submode_tooling_manu_ane, submode_tooling_no_manu)%>%
   gather(tool_use_type,value, submode_tooling_manu_obs, submode_tooling_manu_ane, submode_tooling_no_manu)%>%
-  mutate(group=fct_recode(group, "Old World Monkeys"="ow_monkeys", "New World Monkeys"="nw_monkeys", "Non-primate Mammals"="mammals","Gibbons"="lesser apes", "Great Apes"="great apes", "Invertebrates"="invertebrates", "Fish"="fish", "Amphibians"="amphibians","Reptiles"="reptiles", "Birds"="birds", "Prosimians"="prosimians"), tool_use_type=fct_recode(tool_use_type, "Manufacture"="submode_tooling_manu_obs", "Manufacture (anecdotal)"="submode_tooling_manu_ane", "Tooling"="submode_tooling_no_manu"))%>%
-  mutate(tool_use_type=relevel(tool_use_type,  "Tooling", "Manufacture (anecdotal)","Manufacture"  ))
+  mutate(group=fct_recode(group, "Old World Monkeys"="ow_monkeys", "New World Monkeys"="nw_monkeys", "Non-primate Mammals"="mammals","Gibbons"="lesser apes", "Great Apes"="great apes", "Invertebrates"="invertebrates", "Fish"="fish", "Amphibians"="amphibians","Reptiles"="reptiles", "Birds"="birds", "Prosimians"="prosimians"), tool_use_type=fct_recode(tool_use_type, "Manufacture (obs. / exp.)"="submode_tooling_manu_obs", "Manufacture (anecdotal)"="submode_tooling_manu_ane", "Tooling"="submode_tooling_no_manu"))%>%
+  mutate(tool_use_type=relevel(tool_use_type,  "Tooling", "Manufacture (anecdotal)","Manufacture (obs. / exp.)"  ))
 
 ```
 
@@ -442,8 +442,8 @@ tooling_asso_by_group_evidence<-tooling.group.submode.asso.obs%>%
   mutate(submode_tooling_asso_ane=submode_tooling_asso_all-submode_tooling_asso_obs, submode_tooling_no_assoc=submode_tooling_all-submode_tooling_asso_all)%>%
   select(group, submode_tooling_asso_obs, submode_tooling_asso_ane, submode_tooling_no_assoc)%>%
   gather(tool_use_type,value, submode_tooling_asso_obs, submode_tooling_asso_ane, submode_tooling_no_assoc)%>%
- mutate(group=fct_recode(group, "Old World Monkeys"="ow_monkeys", "New World Monkeys"="nw_monkeys", "Non-primate Mammals"="mammals","Gibbons"="lesser apes", "Great Apes"="great apes", "Invertebrates"="invertebrates", "Fish"="fish", "Amphibians"="amphibians","Reptiles"="reptiles", "Birds"="birds", "Prosimians"="prosimians"), tool_use_type=fct_recode(tool_use_type, "Associative Tooling"="submode_tooling_asso_obs", "Associative Tooling (anecdotal)"="submode_tooling_asso_ane", "Tooling"="submode_tooling_no_assoc"))%>%
-  mutate(tool_use_type=relevel(tool_use_type,  "Tooling", "Associative Tooling (anecdotal)","Associative Tooling"  ))
+ mutate(group=fct_recode(group, "Old World Monkeys"="ow_monkeys", "New World Monkeys"="nw_monkeys", "Non-primate Mammals"="mammals","Gibbons"="lesser apes", "Great Apes"="great apes", "Invertebrates"="invertebrates", "Fish"="fish", "Amphibians"="amphibians","Reptiles"="reptiles", "Birds"="birds", "Prosimians"="prosimians"), tool_use_type=fct_recode(tool_use_type, "Associative Tooling (obs. / exp.)"="submode_tooling_asso_obs", "Associative Tooling (anecdotal)"="submode_tooling_asso_ane", "Tooling"="submode_tooling_no_assoc"))%>%
+  mutate(tool_use_type=relevel(tool_use_type,  "Tooling", "Associative Tooling (anecdotal)","Associative Tooling (obs. / exp.)"  ))
 
 ```
 
@@ -551,6 +551,8 @@ library(RColorBrewer)
 nb.cols <- 17
 mycolors <- colorRampPalette(brewer.pal(8, "Dark2"))(nb.cols)
 
+tooling.mode.data<-tooling.mode.data%>%
+  mutate(mode2=fct_relevel(mode2, "Probe", "Reach", "Pound", "Club", "Jab", "Pry", "Wipe","Absorb", "Dig", "Scratch", "Contain", "Cut", "Affix", "Symbolize", "Brandish", "Block"))
 
 tooling.mode.plot<- ggplot(tooling.mode.data%>%filter(group!="Invertebrates"), aes(x=mode2, y=sum_submode, fill=mode2))+
 geom_bar(width = 1, stat = "identity") + 
@@ -576,20 +578,36 @@ ggsave(tooling.mode.plot, filename = "graphs/tooling_mode_by_group_submode_new_o
 
 ```{r}
 library(RColorBrewer)
+
 nb.cols <- 17
 mycolors <- colorRampPalette(brewer.pal(8, "Dark2"))(nb.cols)
 
 tooling.mode.data<-tooling.mode.data%>%
   mutate(mode2=fct_relevel(mode2, "Probe", "Reach", "Pound", "Club", "Jab", "Pry", "Wipe","Absorb", "Dig", "Scratch", "Contain", "Cut", "Affix", "Symbolize", "Brandish", "Block"))
 
-tooling.mode.plot_refs<- ggplot(tooling.mode.data%>%filter(group!="Invertebrates"), aes(x=mode2, y=sum_studies, fill=mode2))+
+#Function to transform the y-axis (include breaks in the y-axis)
+trans <- function(x){pmin(x,100) + 0.15*pmax(x-100,0)}
+
+yticks <- c(0, 25, 50, 75, 100, 125, 150, 175, 200, 225, 250, 275, 300, 325, 350, 375, 400, 425, 450)
+yticks_lab <- c(0, 25, 50, 75, 100, "", "", "", "", "", 250, "", "", "", "", "", 400, "", "")
+
+#Transform the data onto the display scale
+tooling.mode.data$sum_studies_transformed <- trans(tooling.mode.data$sum_studies)
+
+
+
+tooling.mode.plot_refs<- ggplot(tooling.mode.data%>%filter(group!="Invertebrates"), aes(x=mode2, y=sum_studies_transformed, fill=mode2))+
 geom_bar(width = 1, stat = "identity") + 
-  #coord_polar("y", start=0)+
-  theme_bw()+ # remove background, grid, numeric labels
+  geom_rect(aes(xmin=0, xmax=18, ymin=100, ymax=102), fill="white") +
+  geom_text(x=1, y=148, label="465", color="white", size=2)+
+  geom_text(x=2, y=108, label="195", color="white", size=2)+
+  geom_text(x=3, y=94, label="134", color="white", size=2)+
+  theme_few()+ # remove background, grid, numeric labels
+   scale_y_continuous(limits=c(-1,NA),expand = c(0,0), breaks=trans(yticks), labels=yticks_lab) +
   coord_flip()+
   #scale_fill_manual(values=c("#011638","#003249","#016FB9","#56B4E9","#007EA7","#CDCDCD","#E69F00","#212922","#294936","#999999", "#E69F00"))+
    theme(legend.position="none", panel.grid.major = element_blank(),
-panel.grid.minor = element_blank(), axis.line = element_line(colour = "black")) +
+panel.grid.minor = element_blank(), axis.line = element_line(colour = "black"), plot.background = element_rect(size = 0.5)) +
   facet_wrap(~group) +
   ylab("Number of Sources in Shumaker et al. (2011)")+
   xlab("")+
@@ -598,11 +616,10 @@ panel.grid.minor = element_blank(), axis.line = element_line(colour = "black")) 
 
 tooling.mode.plot_refs
 
-ggsave(tooling.mode.plot_refs, filename = "graphs/Fig3_tooling_mode_by_group_number_references.png", height=7, width = 10, scale=0.66)
+ggsave(tooling.mode.plot_refs, filename = "graphs/Fig3_tooling_mode_by_group_number_references_tranformed_scale.png", height=7, width = 10, scale=0.75)
 
-ggsave(tooling.mode.plot_refs, filename = "graphs/Fig3_tooling_mode_by_group_number_references.pdf", height=7, width = 10, scale=0.66)
+ggsave(tooling.mode.plot_refs, filename = "graphs/Fig3_tooling_mode_by_group_number_references_tranformed_scale.pdf", height=7, width = 10, scale=0.75)
 ```
-
 
 
 ### purpose of submodes
